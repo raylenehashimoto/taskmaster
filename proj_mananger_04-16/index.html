@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskMaster - 项目管理工具</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #fff;
+        }
+        
+        /* 导航栏 */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+        
+        .logo span {
+            color: rgba(46, 204, 113, 0.7);
+            font-weight: normal;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .nav-links a {
+            text-decoration: none;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        
+        .login-btn {
+            padding: 8px 16px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        
+        /* 英雄区域 */
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0 20px;
+            position: relative;
+        }
+        
+        .hero-content {
+            max-width: 800px;
+        }
+        
+        .hero-title {
+            font-size: 60px;
+            font-weight: bold;
+            line-height: 1.2;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .hero-subtitle {
+            font-size: 18px;
+            color: #34495e;
+            margin-bottom: 40px;
+            line-height: 1.5;
+        }
+        
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        
+        .primary-btn {
+            display: inline-block;
+            padding: 16px 40px;
+            background-color: #2ecc71;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .primary-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(46, 204, 113, 0.3);
+        }
+        
+        .secondary-btn {
+            display: inline-block;
+            padding: 16px 40px;
+            background-color: #f5f5f5;
+            color: #333;
+            text-decoration: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .secondary-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* 版本信息 */
+        .version {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #999;
+            background-color: #f9f9f9;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+        
+        /* 功能特点 */
+        .features {
+            padding: 100px 40px;
+            background-color: #f9f9f9;
+        }
+        
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .features-title {
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 60px;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 40px;
+        }
+        
+        .feature-card {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+        
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background-color: #f0f0f0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        .feature-icon svg {
+            width: 30px;
+            height: 30px;
+            color: #333;
+        }
+        
+        .feature-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .feature-description {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        /* 底部工具栏 */
+        .toolbar {
+            background-color: #f9f9f9;
+            border-top: 1px solid #eee;
+            padding: 10px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .toolbar-logo {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .toolbar-links {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .toolbar-links a {
+            text-decoration: none;
+            color: #666;
+            font-size: 12px;
+        }
+        
+        .toolbar-center {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .toolbar-btn {
+            padding: 4px 8px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .toolbar-right span {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 15px 20px;
+            }
+            
+            .hero-title {
+                font-size: 40px;
+            }
+            
+            .hero-subtitle {
+                font-size: 16px;
+            }
+            
+            .hero-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .features {
+                padding: 60px 20px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .toolbar {
+                padding: 10px 20px;
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+        }
+        
+        /* 登录和注册弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-body input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .auth-links {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        .auth-links a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 20px;
+            border-top: 1px solid #f0f0f0;
+        }
+        
+        .modal-footer button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        #submit-login-btn, #submit-register-btn {
+            background-color: #000;
+            color: white;
+        }
+        
+        #cancel-login-btn, #cancel-register-btn {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="logo">Task<span>Master</span></div>
+        <div class="nav-links">
+            <a href="#login" class="login-btn">进入工作台</a>
+        </div>
+    </nav>
+    
+    <!-- 英雄区域 -->
+    <section class="hero">
+        <div class="version">TaskMaster V1.0.0</div>
+        <div class="hero-content">
+            <h1 class="hero-title">让项目管理，<br>更加高效。</h1>
+            <p class="hero-subtitle">专注于目标本身，<br>其他的管理琐碎，交给 TaskMaster 处理。</p>
+            <div class="hero-buttons">
+                <a href="#login" class="primary-btn" onclick="forceLoginHash()">开始使用</a>
+            </div>
+        </div>
+    </section>
+    
+
+    
+
+    
+    <!-- 登录弹窗 -->
+    <div class="modal" id="login-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>登录</h3>
+                <button id="close-login-modal" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="email" id="login-email" placeholder="邮箱">
+                <input type="password" id="login-password" placeholder="密码">
+                <div class="auth-links">
+                    <span>没有账号？</span>
+                    <a href="#" id="go-to-register">立即注册</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="submit-login-btn">登录</button>
+                <button id="cancel-login-btn">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 注册弹窗 -->
+    <div class="modal" id="register-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>注册</h3>
+                <button id="close-register-modal" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="email" id="register-email" placeholder="邮箱">
+                <input type="password" id="register-password" placeholder="密码">
+                <input type="password" id="register-confirm-password" placeholder="确认密码">
+                <div class="auth-links">
+                    <span>已有账号？</span>
+                    <a href="#" id="go-to-login">立即登录</a>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="submit-register-btn">注册</button>
+                <button id="cancel-register-btn">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+    <script>
+        // 直接在 home.html 页面中绑定登录和注册弹窗的事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM 加载完成，绑定登录弹窗事件监听器');
+            
+            // 关闭登录弹窗
+            const closeLoginModalBtn = document.getElementById('close-login-modal');
+            if (closeLoginModalBtn) {
+                closeLoginModalBtn.addEventListener('click', function() {
+                    console.log('点击关闭登录弹窗');
+                    const loginModal = document.getElementById('login-modal');
+                    if (loginModal) {
+                        loginModal.classList.remove('active');
+                    }
+                    // 清除 URL 哈希
+                    window.location.hash = '';
+                    console.log('清除 URL 哈希，当前哈希:', window.location.hash);
+                });
+                console.log('绑定 close-login-modal 事件成功');
+            } else {
+                console.error('找不到 close-login-modal 元素');
+            }
+            
+            // 取消登录
+            const cancelLoginBtn = document.getElementById('cancel-login-btn');
+            if (cancelLoginBtn) {
+                cancelLoginBtn.addEventListener('click', function() {
+                    console.log('点击取消登录');
+                    const loginModal = document.getElementById('login-modal');
+                    if (loginModal) {
+                        loginModal.classList.remove('active');
+                    }
+                    // 清除 URL 哈希
+                    window.location.hash = '';
+                    console.log('清除 URL 哈希，当前哈希:', window.location.hash);
+                });
+                console.log('绑定 cancel-login-btn 事件成功');
+            } else {
+                console.error('找不到 cancel-login-btn 元素');
+            }
+            
+            // 关闭注册弹窗
+            const closeRegisterModalBtn = document.getElementById('close-register-modal');
+            if (closeRegisterModalBtn) {
+                closeRegisterModalBtn.addEventListener('click', function() {
+                    console.log('点击关闭注册弹窗');
+                    const registerModal = document.getElementById('register-modal');
+                    if (registerModal) {
+                        registerModal.classList.remove('active');
+                    }
+                    // 清除 URL 哈希
+                    window.location.hash = '';
+                    console.log('清除 URL 哈希，当前哈希:', window.location.hash);
+                });
+                console.log('绑定 close-register-modal 事件成功');
+            } else {
+                console.error('找不到 close-register-modal 元素');
+            }
+            
+            // 取消注册
+            const cancelRegisterBtn = document.getElementById('cancel-register-btn');
+            if (cancelRegisterBtn) {
+                cancelRegisterBtn.addEventListener('click', function() {
+                    console.log('点击取消注册');
+                    const registerModal = document.getElementById('register-modal');
+                    if (registerModal) {
+                        registerModal.classList.remove('active');
+                    }
+                    // 清除 URL 哈希
+                    window.location.hash = '';
+                    console.log('清除 URL 哈希，当前哈希:', window.location.hash);
+                });
+                console.log('绑定 cancel-register-btn 事件成功');
+            } else {
+                console.error('找不到 cancel-register-btn 元素');
+            }
+            
+            // 登录表单提交
+            const submitLoginBtn = document.getElementById('submit-login-btn');
+            if (submitLoginBtn) {
+                submitLoginBtn.addEventListener('click', function() {
+                    console.log('点击登录按钮');
+                    // 清除 URL 哈希
+                    window.location.hash = '';
+                    console.log('清除 URL 哈希，当前哈希:', window.location.hash);
+                    // 调用 script.js 中的 login 函数
+                    if (typeof login === 'function') {
+                        login();
+                    }
+                });
+                console.log('绑定 submit-login-btn 事件成功');
+            } else {
+                console.error('找不到 submit-login-btn 元素');
+            }
+            
+            // 注册表单提交
+            const submitRegisterBtn = document.getElementById('submit-register-btn');
+            if (submitRegisterBtn) {
+                submitRegisterBtn.addEventListener('click', function() {
+                    console.log('点击注册按钮');
+                    // 清除 URL 哈希
+                    window.location.hash = '';
+                    console.log('清除 URL 哈希，当前哈希:', window.location.hash);
+                    // 调用 script.js 中的 register 函数
+                    if (typeof register === 'function') {
+                        register();
+                    }
+                });
+                console.log('绑定 submit-register-btn 事件成功');
+            } else {
+                console.error('找不到 submit-register-btn 元素');
+            }
+            
+            // 登录页面的注册链接
+            const goToRegisterLink = document.getElementById('go-to-register');
+            if (goToRegisterLink) {
+                goToRegisterLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('点击注册链接');
+                    const loginModal = document.getElementById('login-modal');
+                    const registerModal = document.getElementById('register-modal');
+                    if (loginModal) {
+                        loginModal.classList.remove('active');
+                    }
+                    if (registerModal) {
+                        registerModal.classList.add('active');
+                    }
+                });
+                console.log('绑定 go-to-register 事件成功');
+            } else {
+                console.error('找不到 go-to-register 元素');
+            }
+            
+            // 注册页面的登录链接
+            const goToLoginLink = document.getElementById('go-to-login');
+            if (goToLoginLink) {
+                goToLoginLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('点击登录链接');
+                    const registerModal = document.getElementById('register-modal');
+                    const loginModal = document.getElementById('login-modal');
+                    if (registerModal) {
+                        registerModal.classList.remove('active');
+                    }
+                    if (loginModal) {
+                        loginModal.classList.add('active');
+                    }
+                });
+                console.log('绑定 go-to-login 事件成功');
+            } else {
+                console.error('找不到 go-to-login 元素');
+            }
+            
+            // 检查 URL 哈希并显示登录弹窗
+            if (window.location.hash === '#login') {
+                console.log('发现 #login 哈希，显示登录弹窗');
+                const loginModal = document.getElementById('login-modal');
+                if (loginModal) {
+                    loginModal.classList.add('active');
+                }
+            }
+            
+            // 强制设置登录哈希并显示登录弹窗
+            window.forceLoginHash = function() {
+                console.log('强制设置登录哈希');
+                // 先清除哈希，再设置哈希，确保哈希变化事件会触发
+                window.location.hash = '';
+                setTimeout(function() {
+                    window.location.hash = 'login';
+                    console.log('设置哈希为 #login，当前哈希:', window.location.hash);
+                    // 直接显示登录弹窗，确保即使哈希变化事件不触发也能显示
+                    const loginModal = document.getElementById('login-modal');
+                    if (loginModal) {
+                        loginModal.classList.add('active');
+                        console.log('直接显示登录弹窗');
+                    }
+                }, 100);
+            };
+            
+            // 监听 URL 哈希变化
+            window.addEventListener('hashchange', function() {
+                if (window.location.hash === '#login') {
+                    console.log('哈希变为 #login，显示登录弹窗');
+                    const loginModal = document.getElementById('login-modal');
+                    if (loginModal) {
+                        loginModal.classList.add('active');
+                    }
+                }
+            });
+            
+            // 为登录按钮绑定点击事件
+            const submitLoginBtn = document.getElementById('submit-login-btn');
+            if (submitLoginBtn) {
+                submitLoginBtn.addEventListener('click', function() {
+                    console.log('点击登录按钮');
+                    // 调用 login 函数
+                    if (typeof login === 'function') {
+                        login();
+                    } else {
+                        console.error('login 函数未定义');
+                    }
+                });
+                console.log('绑定 submit-login-btn 事件成功');
+            } else {
+                console.error('找不到 submit-login-btn 元素');
+            }
+            
+            // 为注册按钮绑定点击事件
+            const submitRegisterBtn = document.getElementById('submit-register-btn');
+            if (submitRegisterBtn) {
+                submitRegisterBtn.addEventListener('click', function() {
+                    console.log('点击注册按钮');
+                    // 调用 register 函数
+                    if (typeof register === 'function') {
+                        register();
+                    } else {
+                        console.error('register 函数未定义');
+                    }
+                });
+                console.log('绑定 submit-register-btn 事件成功');
+            } else {
+                console.error('找不到 submit-register-btn 元素');
+            }
+        });
+    </script>
+    <script src="script.js"></script>
+</body>
+</html>
