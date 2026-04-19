@@ -321,14 +321,14 @@ async function init() {
         }
     }
     
-    // 检查登录状态和当前页面
-    checkLoginStatus();
-    
+    // 检查登录状态和当前页面（延迟执行，确保 Firebase 认证状态已恢复）
+    setTimeout(checkLoginStatus, 100);
+
     // 检查 URL 哈希并显示登录弹窗（如果哈希是 #login）
     if (window.location.hash === '#login') {
         showLoginModal();
     }
-    
+
     // 监听 URL 哈希变化，当哈希变为 #login 时显示登录弹窗
     window.addEventListener('hashchange', function() {
         if (window.location.hash === '#login') {
@@ -343,10 +343,10 @@ function checkLoginStatus() {
     const currentPath = window.location.pathname;
     const isLoginPage = currentPath.includes('index.html') || currentPath === '/' || currentPath === '';
     const isDashboardPage = currentPath.includes('dashboard.html');
-    
+
     console.log('检查登录状态，当前页面:', isLoginPage ? 'index.html (登录页)' : isDashboardPage ? 'dashboard.html (工作台)' : '其他');
     console.log('currentUser:', currentUser);
-    
+
     // 检查用户是否登录
     if (currentUser) {
         // 用户已登录
@@ -362,7 +362,7 @@ function checkLoginStatus() {
             const auth = firebase.auth();
             console.log('Firebase auth 实例:', auth);
             console.log('Firebase currentUser:', auth.currentUser);
-            
+
             if (auth.currentUser) {
                 // Firebase 认证状态显示用户已登录
                 console.log('Firebase 认证状态显示用户已登录:', auth.currentUser.email);
@@ -395,13 +395,13 @@ function checkLoginStatus() {
                         }
                     }
                 });
-                
+
                 // 给 Firebase 一点时间来加载认证状态
                 console.log('等待 Firebase 认证状态加载...');
                 return;
             }
         }
-        
+
         // 用户未登录
         console.log('用户未登录');
         if (isDashboardPage) {
@@ -1436,9 +1436,10 @@ function renderCards() {
     // 按分类分组卡片
     const cardsByCategory = {};
     
-    // 筛选卡片，排除已归档分类的卡片
+    // 筛选卡片，排除已归档分类的卡片和已删除的卡片
     const archivedCategoryNames = archivedCategories.map(c => c.name);
-    let filteredCards = cards.filter(card => !card.completed && !archivedCategoryNames.includes(card.category));
+    const deletedCardIds = recycledCards.map(card => card.id);
+    let filteredCards = cards.filter(card => !card.completed && !archivedCategoryNames.includes(card.category) && !deletedCardIds.includes(card.id));
     
     if (currentFilter === 'starred') {
         filteredCards = filteredCards.filter(card => card.starred);
@@ -1583,9 +1584,10 @@ function renderCompletedCards() {
     }
     completedContainer.innerHTML = '';
     
-    // 排除已归档分类的卡片
+    // 排除已归档分类的卡片和已删除的卡片
     const archivedCategoryNames = archivedCategories.map(c => c.name);
-    const filteredCompletedCards = completedCards.filter(card => !archivedCategoryNames.includes(card.category));
+    const deletedCardIds = recycledCards.map(card => card.id);
+    const filteredCompletedCards = completedCards.filter(card => !archivedCategoryNames.includes(card.category) && !deletedCardIds.includes(card.id));
     
     if (filteredCompletedCards && filteredCompletedCards.length > 0) {
         filteredCompletedCards.forEach(card => {
@@ -1617,6 +1619,9 @@ function renderCompletedCards() {
 
 // 筛选卡片
 function filterCards(searchTerm) {
+    // 重新渲染卡片，确保已删除的卡片不会显示
+    renderCards();
+    
     const cardsContainer = document.querySelector('.kanban-board');
     if (!cardsContainer) return;
     
@@ -1669,6 +1674,15 @@ function loadArchivedCollapsedState() {
 // 打开详情页
 function openDetailPage(cardId) {
     currentCardId = cardId;
+    // 获取已删除卡片的ID列表
+    const deletedCardIds = recycledCards.map(card => card.id);
+    
+    // 检查卡片是否已删除
+    if (deletedCardIds.includes(cardId)) {
+        alert('该卡片已被删除，无法访问');
+        return;
+    }
+    
     let card = cards.find(c => c.id === cardId);
     
     // 如果在活跃卡片中找不到，就在已结束卡片中查找
@@ -1774,6 +1788,15 @@ function closeDetailPage() {
 // 导出卡片
 function exportCard() {
     if (currentCardId) {
+        // 获取已删除卡片的ID列表
+        const deletedCardIds = recycledCards.map(card => card.id);
+        
+        // 检查卡片是否已删除
+        if (deletedCardIds.includes(currentCardId)) {
+            alert('该卡片已被删除，无法导出');
+            return;
+        }
+        
         const card = cards.find(c => c.id === currentCardId);
         if (card) {
             // 选择导出格式
@@ -1939,6 +1962,15 @@ function addChecklistItem() {
 
 // 切换清单项状态
 function toggleChecklistItem(cardId, itemId, completed) {
+    // 获取已删除卡片的ID列表
+    const deletedCardIds = recycledCards.map(card => card.id);
+    
+    // 检查卡片是否已删除
+    if (deletedCardIds.includes(cardId)) {
+        alert('该卡片已被删除，无法修改');
+        return;
+    }
+    
     const card = cards.find(c => c.id === cardId);
     if (card) {
         const checklist = card.checklist || [];
@@ -2129,8 +2161,12 @@ function openItemDetail(cardId, itemId) {
             // 填充关联卡片选项
             const relatedCardSelect = document.getElementById('item-related-card');
             if (relatedCardSelect) {
+                // 获取已删除卡片的ID列表
+                const deletedCardIds = recycledCards.map(card => card.id);
+                // 只显示未删除的卡片
+                const availableCards = cards.filter(card => !deletedCardIds.includes(card.id));
                 relatedCardSelect.innerHTML = '<option value="">无</option>' + 
-                    cards.map(c => `<option value="${c.id}" ${item.relatedCard === c.id ? 'selected' : ''}>${c.title}</option>`).join('');
+                    availableCards.map(c => `<option value="${c.id}" ${item.relatedCard === c.id ? 'selected' : ''}>${c.title}</option>`).join('');
             }
             
             // 显示详情页
@@ -2554,8 +2590,30 @@ function login() {
             })
             .catch((error) => {
                 console.error('登录失败:', error);
+                console.error('错误代码:', error.code);
+                console.error('错误信息:', error.message);
                 const errorCode = error.code;
-                const errorMessage = error.message;
+                let errorMessage = '';
+                
+                // 更友好的错误提示
+                switch (errorCode) {
+                    case 'auth/invalid-email':
+                        errorMessage = '邮箱格式不正确';
+                        break;
+                    case 'auth/user-disabled':
+                        errorMessage = '该账号已被禁用';
+                        break;
+                    case 'auth/user-not-found':
+                        errorMessage = '邮箱不存在，请先注册';
+                        break;
+                    case 'auth/wrong-password':
+                    case 'auth/invalid-login-credentials':
+                        errorMessage = '密码错误，请重新输入';
+                        break;
+                    default:
+                        errorMessage = '登录失败，请稍后重试';
+                }
+                
                 alert('登录失败: ' + errorMessage);
             });
     } else {
@@ -2601,7 +2659,23 @@ function register() {
             .catch((error) => {
                 console.error('注册失败:', error);
                 const errorCode = error.code;
-                const errorMessage = error.message;
+                let errorMessage = '';
+                
+                // 更友好的错误提示
+                switch (errorCode) {
+                    case 'auth/invalid-email':
+                        errorMessage = '邮箱格式不正确';
+                        break;
+                    case 'auth/email-already-in-use':
+                        errorMessage = '该邮箱已被注册';
+                        break;
+                    case 'auth/weak-password':
+                        errorMessage = '密码长度至少6位';
+                        break;
+                    default:
+                        errorMessage = '注册失败，请稍后重试';
+                }
+                
                 alert('注册失败: ' + errorMessage);
             });
     } else {
