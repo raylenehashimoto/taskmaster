@@ -487,8 +487,13 @@ function renderCalendar() {
         
         // 添加点击事件
         dayElement.addEventListener('click', function() {
+            // 确保日期处理不受时区影响
             const selectedDate = new Date(year, month, i);
-            const formattedDate = selectedDate.toISOString().slice(0, 10);
+            // 手动格式化日期，避免时区问题
+            const yearStr = selectedDate.getFullYear();
+            const monthStr = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const dayStr = String(selectedDate.getDate()).padStart(2, '0');
+            const formattedDate = `${yearStr}-${monthStr}-${dayStr}`;
             dueDateInput.value = formattedDate;
             calendarPopup.style.display = 'none';
         });
@@ -557,8 +562,13 @@ function renderItemCalendar() {
         
         // 添加点击事件
         dayElement.addEventListener('click', function() {
+            // 确保日期处理不受时区影响
             const selectedDate = new Date(year, month, i);
-            const formattedDate = selectedDate.toISOString().slice(0, 10);
+            // 手动格式化日期，避免时区问题
+            const yearStr = selectedDate.getFullYear();
+            const monthStr = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const dayStr = String(selectedDate.getDate()).padStart(2, '0');
+            const formattedDate = `${yearStr}-${monthStr}-${dayStr}`;
             dueDateInput.value = formattedDate;
             calendarPopup.style.display = 'none';
         });
@@ -1823,6 +1833,9 @@ function openDetailPage(cardId) {
             const itemElement = document.createElement('div');
             itemElement.className = `detail-checklist-item ${item.completed ? 'completed' : ''}`;
             
+            // 创建内容容器
+            const contentContainer = document.createElement('div');
+            
             // 创建复选框
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -1833,12 +1846,12 @@ function openDetailPage(cardId) {
                 e.stopPropagation();
                 toggleChecklistItem(card.id, item.id, this.checked);
             });
-            itemElement.appendChild(checkbox);
+            contentContainer.appendChild(checkbox);
             
             // 创建文本
             const textSpan = document.createElement('span');
             textSpan.textContent = item.text;
-            itemElement.appendChild(textSpan);
+            contentContainer.appendChild(textSpan);
             
             // 显示截止时间和剩余天数（如果有且任务未完成）
             if (item.dueDate && !item.completed) {
@@ -1853,12 +1866,12 @@ function openDetailPage(cardId) {
                 const dueDateSpan = document.createElement('span');
                 dueDateSpan.className = 'checklist-due-date';
                 dueDateSpan.textContent = '截止: ' + dueDate.toLocaleDateString();
-                itemElement.appendChild(dueDateSpan);
+                contentContainer.appendChild(dueDateSpan);
                 
                 const daysLeftSpan = document.createElement('span');
                 daysLeftSpan.className = `checklist-days-left ${daysDiff < 0 ? 'overdue' : daysDiff === 0 ? 'today' : ''}`;
                 daysLeftSpan.textContent = daysDiff < 0 ? `已逾期${Math.abs(daysDiff)}天` : daysDiff === 0 ? '今天到期' : `剩余${daysDiff}天`;
-                itemElement.appendChild(daysLeftSpan);
+                contentContainer.appendChild(daysLeftSpan);
             }
             
             // 创建编辑按钮
@@ -1868,7 +1881,9 @@ function openDetailPage(cardId) {
                 e.stopPropagation();
                 openItemDetail(card.id, item.id);
             });
-            itemElement.appendChild(editButton);
+            contentContainer.appendChild(editButton);
+            
+            itemElement.appendChild(contentContainer);
             
             // 先添加任务项
             checklistContainer.appendChild(itemElement);
@@ -1967,12 +1982,24 @@ function exportAsImage(card) {
     // 获取卡片详情页的内容
     const detailContent = document.querySelector('.card-detail-content');
     
+    // 临时设置容器高度为自动，确保所有内容都可见
+    const originalHeight = detailContent.style.height;
+    detailContent.style.height = 'auto';
+    
     // 使用html2canvas将内容转换为图片
     html2canvas(detailContent, {
         scale: 2, // 提高图片质量
         useCORS: true, // 允许跨域图片
-        logging: false
+        logging: false,
+        scrollY: 0, // 从顶部开始捕获
+        scrollX: 0,
+        windowWidth: detailContent.scrollWidth,
+        windowHeight: detailContent.scrollHeight,
+        backgroundColor: '#ffffff' // 设置背景色为白色
     }).then(canvas => {
+        // 恢复原始高度
+        detailContent.style.height = originalHeight;
+        
         // 创建下载链接
         const link = document.createElement('a');
         link.href = canvas.toDataURL('image/png');
@@ -1980,6 +2007,10 @@ function exportAsImage(card) {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    }).catch(error => {
+        // 恢复原始高度
+        detailContent.style.height = originalHeight;
+        console.error('导出图片失败:', error);
     });
 }
 
