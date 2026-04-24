@@ -1121,6 +1121,35 @@ body {
     background-color: #f5f5f5;
     border-radius: 6px;
     flex-wrap: wrap;
+    cursor: grab;
+    transition: all 0.2s ease;
+}
+
+.detail-checklist-item:active {
+    cursor: grabbing;
+}
+
+.detail-checklist-item.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.detail-checklist-item.drag-over {
+    border: 2px dashed #3498db;
+    background-color: #e3f2fd;
+}
+
+.detail-checklist-item.completed {
+    text-decoration: line-through;
+    color: #95a5a6;
+    background-color: #e8f5e8;
+    border-left: 4px solid #4caf50;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+.detail-checklist-item.completed span:first-of-type {
+    text-decoration: line-through;
 }
 
 .detail-checklist-item > div {

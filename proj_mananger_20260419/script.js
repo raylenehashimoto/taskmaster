@@ -1885,6 +1885,59 @@ function openDetailPage(cardId) {
             
             itemElement.appendChild(contentContainer);
             
+            // 添加拖拽相关事件监听器
+            itemElement.setAttribute('draggable', 'true');
+            itemElement.addEventListener('dragstart', function(e) {
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', item.id);
+            });
+            
+            itemElement.addEventListener('dragend', function() {
+                this.classList.remove('dragging');
+                // 移除所有drag-over类
+                document.querySelectorAll('.detail-checklist-item').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+            });
+            
+            itemElement.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                // 移除其他元素的drag-over类
+                document.querySelectorAll('.detail-checklist-item').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                // 添加drag-over类到当前元素
+                this.classList.add('drag-over');
+            });
+            
+            itemElement.addEventListener('drop', function(e) {
+                e.preventDefault();
+                const draggedItemId = e.dataTransfer.getData('text/plain');
+                if (draggedItemId !== item.id) {
+                    // 找到被拖拽的项目和目标项目
+                    const draggedIndex = checklist.findIndex(i => i.id === draggedItemId);
+                    const targetIndex = checklist.findIndex(i => i.id === item.id);
+                    
+                    if (draggedIndex !== -1 && targetIndex !== -1) {
+                        // 移动项目
+                        const [draggedItem] = checklist.splice(draggedIndex, 1);
+                        checklist.splice(targetIndex, 0, draggedItem);
+                        
+                        // 保存数据
+                        saveData('cards', cards);
+                        
+                        // 重新渲染
+                        if (currentCardId === card.id) {
+                            openDetailPage(card.id);
+                        }
+                    }
+                }
+                // 移除drag-over类
+                this.classList.remove('drag-over');
+            });
+            
             // 先添加任务项
             checklistContainer.appendChild(itemElement);
             
