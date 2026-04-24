@@ -615,6 +615,7 @@ function bindEvents() {
                     this.classList.add('active');
                     currentFilter = this.dataset.category;
                     renderCards();
+                    renderCompletedCards();
                 });
             });
             console.log('绑定 filter-btn 事件成功');
@@ -641,7 +642,29 @@ function bindEvents() {
         } else {
             console.error('找不到 add-detail-checklist-btn 元素');
         }
-        
+
+        // 卡片备注
+        const cardNoteInput = document.getElementById('card-note-input');
+        if (cardNoteInput) {
+            cardNoteInput.addEventListener('blur', function() {
+                if (currentCardId) {
+                    let card = cards.find(c => c.id === currentCardId);
+                    let cardArray = cards;
+                    
+                    // 如果在活跃卡片中找不到，就在已结束卡片中查找
+                    if (!card) {
+                        card = completedCards.find(c => c.id === currentCardId);
+                        cardArray = completedCards;
+                    }
+                    
+                    if (card) {
+                        card.note = cardNoteInput.value;
+                        saveData(cardArray === cards ? 'cards' : 'completedCards', cardArray);
+                    }
+                }
+            });
+        }
+
         // 重命名卡片
         const renameCardBtn = document.getElementById('rename-card-btn');
         if (renameCardBtn) {
@@ -1286,6 +1309,7 @@ function renderFilterButtons() {
         this.classList.add('active');
         currentFilter = this.dataset.category;
         renderCards();
+        renderCompletedCards();
     });
     leftFilterContainer.appendChild(allBtn);
     
@@ -1299,6 +1323,7 @@ function renderFilterButtons() {
         this.classList.add('active');
         currentFilter = this.dataset.category;
         renderCards();
+        renderCompletedCards();
     });
     leftFilterContainer.appendChild(starredBtn);
     
@@ -1312,6 +1337,7 @@ function renderFilterButtons() {
         this.classList.add('active');
         currentFilter = this.dataset.category;
         renderCards();
+        renderCompletedCards();
     });
     leftFilterContainer.appendChild(upcomingBtn);
     
@@ -1334,6 +1360,7 @@ function renderFilterButtons() {
             this.classList.add('active');
             currentFilter = this.dataset.category;
             renderCards();
+            renderCompletedCards();
         });
         
         rightFilterContainer.appendChild(btn);
@@ -1414,7 +1441,8 @@ function addCardFromModal() {
             checklist: [],
             completed: false,
             createdAt: new Date().toISOString(),
-            starred: false
+            starred: false,
+            note: ''
         };
         
         cards.push(card);
@@ -1475,10 +1503,33 @@ function renderCards() {
     
     // 创建看板列
     if (currentFilter === 'all') {
-        // 当筛选为"全部"时，只为包含卡片的分类创建看板列
         categories.forEach(category => {
             const categoryCards = cardsByCategory[category] || [];
-            // 只显示有卡片的分类
+            const column = document.createElement('div');
+            column.className = 'kanban-column';
+            column.innerHTML = `
+                <h3>${category}</h3>
+                <div class="cards-container" data-category="${category}"></div>
+                <button class="add-card-btn" onclick="showAddCardForm('${category}')">添加卡片</button>
+            `;
+            kanbanBoard.appendChild(column);
+            
+            const container = column.querySelector('.cards-container');
+            if (categoryCards.length > 0) {
+                categoryCards.forEach(card => {
+                    container.appendChild(createCardElement(card));
+                });
+            } else {
+                // 显示空状态提示
+                const emptyState = document.createElement('div');
+                emptyState.className = 'empty-state';
+                emptyState.innerHTML = '<p>暂无卡片，点击下方按钮添加</p>';
+                container.appendChild(emptyState);
+            }
+        });
+    } else if (currentFilter === 'starred' || currentFilter === 'upcoming') {
+        Object.keys(cardsByCategory).forEach(category => {
+            const categoryCards = cardsByCategory[category] || [];
             if (categoryCards.length > 0) {
                 const column = document.createElement('div');
                 column.className = 'kanban-column';
@@ -1495,26 +1546,8 @@ function renderCards() {
                 });
             }
         });
-    } else if (currentFilter === 'starred' || currentFilter === 'upcoming') {
-        // 当筛选为"星标卡片"或"快到期"时，只为包含相关卡片的分类创建看板列
-        Object.keys(cardsByCategory).forEach(category => {
-            const column = document.createElement('div');
-            column.className = 'kanban-column';
-            column.innerHTML = `
-                <h3>${category}</h3>
-                <div class="cards-container" data-category="${category}"></div>
-                <button class="add-card-btn" onclick="showAddCardForm('${category}')">添加卡片</button>
-            `;
-            kanbanBoard.appendChild(column);
-            
-            const container = column.querySelector('.cards-container');
-            const categoryCards = cardsByCategory[category] || [];
-            categoryCards.forEach(card => {
-                container.appendChild(createCardElement(card));
-            });
-        });
     } else {
-        // 当筛选为特定分类时，只为该分类创建看板列
+        const categoryCards = cardsByCategory[currentFilter] || [];
         const column = document.createElement('div');
         column.className = 'kanban-column';
         column.innerHTML = `
@@ -1525,10 +1558,17 @@ function renderCards() {
         kanbanBoard.appendChild(column);
         
         const container = column.querySelector('.cards-container');
-        const categoryCards = cardsByCategory[currentFilter] || [];
-        categoryCards.forEach(card => {
-            container.appendChild(createCardElement(card));
-        });
+        if (categoryCards.length > 0) {
+            categoryCards.forEach(card => {
+                container.appendChild(createCardElement(card));
+            });
+        } else {
+            // 显示空状态提示
+            const emptyState = document.createElement('div');
+            emptyState.className = 'empty-state';
+            emptyState.innerHTML = '<p>暂无卡片，点击下方按钮添加</p>';
+            container.appendChild(emptyState);
+        }
     }
     
     // 渲染已结束卡片
@@ -1575,42 +1615,114 @@ function createCardElement(card) {
     return cardElement;
 }
 
-// 渲染已结束卡片
+// 创建已完成卡片元素
+function createCompletedCardElement(card) {
+    const cardElement = document.createElement('div');
+    cardElement.className = 'card completed';
+    cardElement.dataset.id = card.id;
+    
+    cardElement.innerHTML = `
+        <div class="card-header">
+            <h3 class="card-title">${card.title || '无标题'}</h3>
+            <button class="star-btn" onclick="toggleStar('${card.id}'); event.stopPropagation();">
+                <span class="star-icon ${card.starred ? 'starred' : ''}">☆</span>
+            </button>
+        </div>
+        <div class="card-category">${card.category || '无分类'}</div>
+        <div class="card-footer">
+            <span>已完成于 ${card.completedAt ? new Date(card.completedAt).toLocaleString() : '未知时间'}</span>
+            <div class="footer-actions">
+                <button class="restore-btn" onclick="restoreCompletedCard('${card.id}'); event.stopPropagation();">还原</button>
+                <button class="complete-btn" onclick="deleteCompletedCard('${card.id}'); event.stopPropagation();">删除</button>
+            </div>
+        </div>
+    `;
+    
+    cardElement.addEventListener('click', () => openDetailPage(card.id));
+    return cardElement;
+}
+
+// 还原已完成卡片
+function restoreCompletedCard(cardId) {
+    const cardIndex = completedCards.findIndex(card => card.id === cardId);
+    if (cardIndex !== -1) {
+        const card = completedCards[cardIndex];
+        const cardCategory = card.category;
+        // 移除已完成标记
+        delete card.completedAt;
+        delete card.completed;
+        // 从已完成数组中移除
+        completedCards.splice(cardIndex, 1);
+        // 添加到活跃卡片数组
+        cards.push(card);
+        // 保存数据
+        saveData('cards', cards);
+        saveData('completedCards', completedCards);
+        // 重新渲染
+        renderCards();
+        renderCompletedCards();
+        
+        // 显示还原成功提示
+        alert(`卡片已还原到「${cardCategory}」项目中`);
+        
+        // 如果当前筛选的不是全部，且还原的卡片不属于当前筛选项目，自动切换到全部视图
+        if (currentFilter !== 'all' && currentFilter !== cardCategory) {
+            // 找到全部筛选按钮并点击
+            const allBtn = document.querySelector('[data-category="all"]');
+            if (allBtn) {
+                allBtn.click();
+            }
+        }
+    }
+}
+
+// 渲染已结束卡片（按项目分组显示）
 function renderCompletedCards() {
     const completedContainer = document.getElementById('completed-cards');
     if (!completedContainer) {
-        // 在 home.html 页面中，completed-cards 元素不存在，直接返回
         return;
     }
     completedContainer.innerHTML = '';
-    
-    // 排除已归档分类的卡片和已删除的卡片
+
     const archivedCategoryNames = archivedCategories.map(c => c.name);
     const deletedCardIds = recycledCards.map(card => card.id);
-    const filteredCompletedCards = completedCards.filter(card => !archivedCategoryNames.includes(card.category) && !deletedCardIds.includes(card.id));
-    
+    let filteredCompletedCards = completedCards.filter(card => !archivedCategoryNames.includes(card.category) && !deletedCardIds.includes(card.id));
+
+    // 根据筛选条件过滤已完成卡片
+    if (currentFilter === 'starred') {
+        filteredCompletedCards = filteredCompletedCards.filter(card => card.starred);
+    } else if (currentFilter !== 'all') {
+        filteredCompletedCards = filteredCompletedCards.filter(card => card.category === currentFilter);
+    }
+
     if (filteredCompletedCards && filteredCompletedCards.length > 0) {
+        const cardsByCategory = {};
         filteredCompletedCards.forEach(card => {
-            const cardElement = document.createElement('div');
-            cardElement.className = 'card';
-            cardElement.dataset.id = card.id;
-            
-            cardElement.innerHTML = `
-                <div class="card-header">
-                    <h3 class="card-title">${card.title || '无标题'}</h3>
-                    <button class="star-btn" onclick="toggleStar('${card.id}'); event.stopPropagation();">
-                        <span class="star-icon ${card.starred ? 'starred' : ''}">☆</span>
-                    </button>
-                </div>
-                <div class="card-category">${card.category || '无分类'}</div>
-                <div class="card-footer">
-                    <span>已完成于 ${card.completedAt ? new Date(card.completedAt).toLocaleString() : '未知时间'}</span>
-                    <button class="complete-btn" onclick="deleteCompletedCard('${card.id}'); event.stopPropagation();">删除</button>
-                </div>
-            `;
-            
-            cardElement.addEventListener('click', () => openDetailPage(card.id));
-            completedContainer.appendChild(cardElement);
+            if (!cardsByCategory[card.category]) {
+                cardsByCategory[card.category] = [];
+            }
+            cardsByCategory[card.category].push(card);
+        });
+
+        Object.keys(cardsByCategory).forEach(category => {
+            const categoryGroup = document.createElement('div');
+            categoryGroup.className = 'completed-category-group';
+
+            const categoryHeader = document.createElement('div');
+            categoryHeader.className = 'completed-category-header';
+            categoryHeader.innerHTML = `<h3>${category}</h3>`;
+            categoryGroup.appendChild(categoryHeader);
+
+            const categoryCardsContainer = document.createElement('div');
+            categoryCardsContainer.className = 'completed-category-cards';
+
+            cardsByCategory[category].forEach(card => {
+                const cardElement = createCompletedCardElement(card);
+                categoryCardsContainer.appendChild(cardElement);
+            });
+
+            categoryGroup.appendChild(categoryCardsContainer);
+            completedContainer.appendChild(categoryGroup);
         });
     } else {
         completedContainer.innerHTML = '<p class="no-cards">暂无已结束卡片</p>';
@@ -1694,7 +1806,8 @@ function openDetailPage(cardId) {
         document.getElementById('detail-title').textContent = card.title;
         document.getElementById('detail-category').textContent = card.category;
         document.getElementById('detail-created').textContent = new Date(card.createdAt).toLocaleString();
-        
+        document.getElementById('card-note-input').value = card.note || '';
+
         // 更新星标状态
         const starIcon = document.querySelector('#star-btn .star-icon');
         starIcon.className = `star-icon ${card.starred ? 'starred' : ''}`;
